@@ -30,8 +30,22 @@ builder.Services.AddOpenApiDocument(config =>
     config.Version = "v1";
 });
 
+var allowedOrigin = "http://localhost:3000"; // or 3000, etc.
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendOnly", policy =>
+    {
+        policy.WithOrigins(allowedOrigin)   // exact origin, no '*'
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();          // required if using cookies
+    });
+});
+
 var app = builder.Build();
 
+app.UseCors("FrontendOnly");
 app.UseAuthentication();
 app.UseAuthorization();
 
