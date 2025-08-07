@@ -56,3 +56,4 @@ C:\Users\brisius\Desktop\brucewnd\back\Brucewnd\obj\Debug\net9.0\refint\Brucewnd
 C:\Users\brisius\Desktop\brucewnd\back\Brucewnd\obj\Debug\net9.0\Brucewnd.pdb
 C:\Users\brisius\Desktop\brucewnd\back\Brucewnd\obj\Debug\net9.0\Brucewnd.genruntimeconfig.cache
 C:\Users\brisius\Desktop\brucewnd\back\Brucewnd\obj\Debug\net9.0\ref\Brucewnd.dll
+C:\Users\brisius\Desktop\brucewnd\back\Brucewnd\obj\Debug\net9.0\Brucewnd.sourcelink.json
