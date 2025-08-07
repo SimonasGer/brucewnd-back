@@ -9,8 +9,8 @@ public static class JwtHelper
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Username)
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.Username)
         };
 
         foreach (var role in user.UserRoles.Select(ur => ur.Role.Name))
