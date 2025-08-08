@@ -4,39 +4,71 @@ public static class UserEndpoints
 {
     public static void MapUserEndpoints(this IEndpointRouteBuilder app)
     {
-        // Register user
+// Register user
         app.MapPost("/users/register", async (RegisterUserDto dto, AppDbContext db, IConfiguration config) =>
         {
-            var exists = await db.Users.AnyAsync(u => u.Username == dto.Username);
-            if (exists)
+            // duplicate username check
+            if (await db.Users.AnyAsync(u => u.Username == dto.Username))
                 return Results.BadRequest("Username already taken.");
 
-            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            var strategy = db.Database.CreateExecutionStrategy();
 
-            var user = new User
+            return await strategy.ExecuteAsync(async () =>
             {
-                Username = dto.Username,
-                PasswordHash = hashedPassword
-            };
+                await using var tx = await db.Database.BeginTransactionAsync();
 
-            var role = await db.Roles.FirstOrDefaultAsync(r => r.Name == "user")
-                ?? new Role { Name = "user" };
+                var isFirstUser = !await db.Users.AnyAsync();
 
-            user.UserRoles.Add(new UserRole { Role = role });
+                var user = new User
+                {
+                    Username = dto.Username,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password)
+                };
 
-            db.Users.Add(user);
-            await db.SaveChangesAsync();
+                static async Task<Role> GetOrCreateRoleAsync(AppDbContext db, string name)
+                {
+                    var role = await db.Roles.SingleOrDefaultAsync(r => r.Name == name);
+                    if (role is null)
+                    {
+                        role = new Role { Name = name };
+                        db.Roles.Add(role);
+                        await db.SaveChangesAsync();
+                    }
+                    return role;
+                }
 
-            var token = JwtHelper.GenerateToken(user, config);
+                var rolesToAssign = new List<string> { "user" };
+                if (isFirstUser) rolesToAssign.AddRange(new[] { "mod", "admin" });
 
-            return Results.Created($"/users/{user.Id}", new
-            {
-                user.Id,
-                user.Username,
-                Roles = new[] { "user" },
-                Token = token
+                foreach (var rn in rolesToAssign.Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    var role = await GetOrCreateRoleAsync(db, rn);
+                    user.UserRoles.Add(new UserRole { RoleId = role.Id, Role = role, User = user });
+                }
+
+                db.Users.Add(user);
+                await db.SaveChangesAsync();
+
+                await tx.CommitAsync();
+
+                // reload with roles for JWT
+                var withRoles = await db.Users
+                    .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                    .SingleAsync(u => u.Id == user.Id);
+
+                var token = JwtHelper.GenerateToken(withRoles, config);
+
+                return Results.Created($"/users/{withRoles.Id}", new
+                {
+                    withRoles.Id,
+                    withRoles.Username,
+                    Roles = withRoles.UserRoles.Select(ur => ur.Role.Name).ToArray(),
+                    Token = token
+                });
             });
         });
+
+
 
         // Login user
         app.MapPost("/users/login", async (LoginUserDto dto, AppDbContext db, IConfiguration config) =>
