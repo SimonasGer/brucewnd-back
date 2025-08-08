@@ -1,7 +1,7 @@
 public class ComicTag
 {
-    public int Id { get; set; }
-    public required string Name { get; set; } = null!;
-
-    public List<Comic> Comics { get; set; } = [];
+    public int ComicId { get; set; }
+    public Comic Comic { get; set; } = null!;
+    public int TagId { get; set; }
+    public Tag Tag { get; set; } = null!;
 }
