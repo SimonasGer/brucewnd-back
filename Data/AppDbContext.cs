@@ -6,6 +6,7 @@ public class AppDbContext : DbContext
 
     public DbSet<Comic> Comics => Set<Comic>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<Chapter> Chapters => Set<Chapter>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<Tag> Tags => Set<Tag>();
@@ -41,6 +42,10 @@ public class AppDbContext : DbContext
         b.Entity<Comic>()
             .Property(c => c.Name)
             .IsRequired();
+
+        b.Entity<Comic>()
+            .HasIndex(c => c.Name)
+            .IsUnique();
 
         // Tie Comic to Author (no cascade delete wiping comics if a user is removed)
         b.Entity<Comic>()
@@ -83,5 +88,38 @@ public class AppDbContext : DbContext
         b.Entity<ComicTag>()
             .HasIndex(ct => new { ct.ComicId, ct.TagId })
             .IsUnique();
+            
+        // ---- Chapters
+        b.Entity<Chapter>(e =>
+        {
+            e.HasKey(ch => ch.Id);
+
+            e.Property(ch => ch.Title)
+                .IsRequired();
+
+            e.Property(ch => ch.ChapterNumber)
+                .IsRequired();
+
+            // Optional: DB-side defaults (Postgres)
+            e.Property(ch => ch.CreatedAt)
+                .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+            e.Property(ch => ch.IsPublished)
+                .HasDefaultValue(false);
+
+            // One Comic -> many Chapters
+            e.HasOne(ch => ch.Comic)
+                .WithMany(c => c.Chapters)
+                .HasForeignKey(ch => ch.ComicId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Unique chapter number per comic (no duplicates like 1 twice)
+            e.HasIndex(ch => new { ch.ComicId, ch.ChapterNumber })
+                .IsUnique();
+
+            // Optional: keep numbers positive
+            e.ToTable(t => t.HasCheckConstraint("CK_Chapter_ChapterNumber_Positive", "\"ChapterNumber\" > 0"));
+        });
+
     }
 }
