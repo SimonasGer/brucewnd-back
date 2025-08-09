@@ -61,7 +61,7 @@ public static class ComicEndpoints
                 IsPublished = comic.IsPublished,
                 AuthorUsername = comic.Author.Username,
                 Tags = [], // fill if you wire tags
-                Chapters = chQuery
+                Chapters = [.. chQuery
                     .OrderBy(ch => ch.ChapterNumber)
                     .Select(ch => new ChapterSummaryDto
                     {
@@ -70,8 +70,7 @@ public static class ComicEndpoints
                         Number = ch.ChapterNumber,      // <-- mapped to Number
                         IsPublished = ch.IsPublished,
                         CreatedAt = ch.CreatedAt
-                    })
-                    .ToList()
+                    })]
             };
 
             return Results.Ok(dto);
@@ -286,14 +285,11 @@ public static class ComicEndpoints
         }).RequireAuthorization();
 
         // ========= S3 presign (auth or admin? choose; here: admin only) =========
-        _ = app.MapPost("/uploads/presign", (
-            [FromBody] PresignDto reqBody,
-            ClaimsPrincipal user) =>
+        app.MapPost("/uploads/presign", ([FromBody] PresignDto reqBody, ClaimsPrincipal user) =>
         {
             if (!IsAdmin(user)) return Results.Forbid();
 
             var bucket = "brucewnd-comics";
-            var regionHost = "s3.eu-north-1.amazonaws.com";
             var key = $"covers/{Guid.NewGuid():N}{Path.GetExtension(reqBody.FileName)}";
 
             var s3 = new AmazonS3Client(Amazon.RegionEndpoint.EUNorth1);
@@ -303,10 +299,11 @@ public static class ComicEndpoints
                 Key = key,
                 Verb = HttpVerb.PUT,
                 Expires = DateTime.UtcNow.AddMinutes(5),
-                ContentType = reqBody.ContentType
+                // DO NOT set ContentType here
             };
+
             var uploadUrl = s3.GetPreSignedURL(req);
-            var publicUrl = $"https://{bucket}.{regionHost}/{key}";
+            var publicUrl = $"https://{bucket}.s3.eu-north-1.amazonaws.com/{key}";
             return Results.Ok(new { uploadUrl, publicUrl });
         }).RequireAuthorization();
     }
